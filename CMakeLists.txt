@@ -4,7 +4,7 @@ project(VulkanTutorial)
 find_package(Vulkan REQUIRED)
 
 set(GLFW_DIR "submodules/glfw")
-add_subdirectory(${GLFW_DIR})
+add_subdirectory(${GLFW_DIR} EXCLUDE_FROM_ALL)
 
 add_executable(${PROJECT_NAME}
     main.cpp)

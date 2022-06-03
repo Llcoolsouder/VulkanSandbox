@@ -26,6 +26,8 @@ private:
 
     void createInstance();
 
+    void pickPhysicalDevice();
+
     bool checkValidationLayerSupport();
 
     std::vector<char const *> getRequireExtensions();
@@ -37,6 +39,7 @@ private:
 private:
     GLFWwindow *mpWindow;
     VkInstance mInstance;
+    VkPhysicalDevice mPhysicalDevice = VK_NULL_HANDLE;
     VkDebugUtilsMessengerEXT mDebugMessenger;
 };
 

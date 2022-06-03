@@ -76,6 +76,44 @@ void HelloTriangleApplication::initVulkan()
 {
     createInstance();
     setupDebugMessenger();
+    pickPhysicalDevice();
+}
+
+bool isDeviceSuitable(VkPhysicalDevice const &device)
+{
+    VkPhysicalDeviceProperties deviceProperties;
+    vkGetPhysicalDeviceProperties(device, &deviceProperties);
+
+    VkPhysicalDeviceFeatures deviceFeatures;
+    vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+
+    return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && deviceFeatures.geometryShader;
+}
+
+void HelloTriangleApplication::pickPhysicalDevice()
+{
+    uint32_t deviceCount = 0;
+    vkEnumeratePhysicalDevices(mInstance, &deviceCount, nullptr);
+    if (deviceCount == 0)
+    {
+        throw std::runtime_error("Failed to find GPU with Vulkan support!");
+    }
+    std::vector<VkPhysicalDevice> devices(deviceCount);
+    vkEnumeratePhysicalDevices(mInstance, &deviceCount, devices.data());
+
+    // Get first suitable device
+    for (auto const &device : devices)
+    {
+        if (isDeviceSuitable(device))
+        {
+            mPhysicalDevice = device;
+            break;
+        }
+    }
+    if (mPhysicalDevice == VK_NULL_HANDLE)
+    {
+        throw std::runtime_error("Failed to find a suitable GPU");
+    }
 }
 
 VkDebugUtilsMessengerCreateInfoEXT HelloTriangleApplication::getDefaultDebugUtilsMessengerCreateInfoEXT()

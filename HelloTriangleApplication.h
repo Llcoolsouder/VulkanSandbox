@@ -4,43 +4,24 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include <iostream>
 #include <cstdlib>
+#include <iostream>
 #include <stdexcept>
 #include <vector>
 
-
-class HelloTriangleApplication
-{
+class HelloTriangleApplication {
 public:
-    void run();
+  HelloTriangleApplication();
+
+  ~HelloTriangleApplication();
+
+  void Run();
 
 private:
-    void initWindow();
-
-    void initVulkan();
-
-    VkDebugUtilsMessengerCreateInfoEXT getDefaultDebugUtilsMessengerCreateInfoEXT();
-
-    void setupDebugMessenger();
-
-    void createInstance();
-
-    void pickPhysicalDevice();
-
-    bool checkValidationLayerSupport();
-
-    std::vector<char const *> getRequireExtensions();
-
-    void mainLoop();
-
-    void cleanup();
-
-private:
-    GLFWwindow *mpWindow;
-    VkInstance mInstance;
-    VkPhysicalDevice mPhysicalDevice = VK_NULL_HANDLE;
-    VkDebugUtilsMessengerEXT mDebugMessenger;
+  GLFWwindow *mpWindow;
+  VkInstance mInstance;
+  VkPhysicalDevice mPhysicalDevice = VK_NULL_HANDLE;
+  VkDebugUtilsMessengerEXT mDebugMessenger;
 };
 
-#endif  //_HELLO_TRIANGLE_APPLICATION_H_
+#endif //_HELLO_TRIANGLE_APPLICATION_H_

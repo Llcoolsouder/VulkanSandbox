@@ -28,6 +28,14 @@ static VkPhysicalDevice PickPhysicalDevice(VkInstance const &instance);
 
 static bool IsDeviceSuitable(VkPhysicalDevice const &device);
 
+static VkDevice
+CreateLogicalDevice(VkPhysicalDevice const &physicalDevice,
+                    QueueFamilyIndices const &queueFamilyIndices);
+
+static VkQueue
+GetGraphicsQueueHandle(VkDevice const &device,
+                       QueueFamilyIndices const &queueFamilyIndices);
+
 static VkDebugUtilsMessengerEXT SetupDebugMessenger(VkInstance const &instance);
 
 static bool CheckValidationLayerSupport();
@@ -60,11 +68,14 @@ HelloTriangleApplication::HelloTriangleApplication()
       mInstance(CreateInstance()),
       mPhysicalDevice(PickPhysicalDevice(mInstance)),
       mQueueFamilyIndices(FindQueueFamilies(mPhysicalDevice)),
+      mDevice(CreateLogicalDevice(mPhysicalDevice, mQueueFamilyIndices)),
+      mGraphicsQueue(GetGraphicsQueueHandle(mDevice, mQueueFamilyIndices)),
       mDebugMessenger(SetupDebugMessenger(mInstance)) {}
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 HelloTriangleApplication::~HelloTriangleApplication() {
+  vkDestroyDevice(mDevice, nullptr);
   if (ENABLE_VALIDATION_LAYERS) {
     DestroyDebugUtilsMessengerEXT(mInstance, mDebugMessenger, nullptr);
   }
@@ -212,6 +223,50 @@ bool IsDeviceSuitable(VkPhysicalDevice const &device) {
 
   return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
          deviceFeatures.geometryShader;
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+VkDevice CreateLogicalDevice(VkPhysicalDevice const &physicalDevice,
+                             QueueFamilyIndices const &queueFamilyIndices) {
+  VkDeviceQueueCreateInfo queueCreateInfo{};
+  queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+  queueCreateInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+  queueCreateInfo.queueCount = 1;
+  float const queuePriority = 1.0f;
+  queueCreateInfo.pQueuePriorities = &queuePriority;
+
+  VkPhysicalDeviceFeatures physicsalDeviceFeatures{};
+
+  VkDeviceCreateInfo deviceCreateInfo{};
+  deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+  deviceCreateInfo.queueCreateInfoCount = 1;
+  deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+  deviceCreateInfo.enabledExtensionCount = 0;
+
+  if (ENABLE_VALIDATION_LAYERS) {
+    deviceCreateInfo.enabledLayerCount = VALIDATION_LAYERS.size();
+    deviceCreateInfo.ppEnabledLayerNames = VALIDATION_LAYERS.data();
+  } else {
+    deviceCreateInfo.enabledLayerCount = 0;
+  }
+
+  VkDevice device;
+  if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) !=
+      VK_SUCCESS) {
+    throw std::runtime_error("Unable to create Vulkan logical device");
+  }
+  return device;
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+VkQueue GetGraphicsQueueHandle(VkDevice const &device,
+                               QueueFamilyIndices const &queueFamilyIndices) {
+  VkQueue queueHandle;
+  vkGetDeviceQueue(
+      device, queueFamilyIndices.graphicsFamily.value(), 0, &queueHandle);
+  return queueHandle;
 }
 
 //------------------------------------------------------------------------------

@@ -29,6 +29,8 @@ private:
   VkInstance mInstance;
   VkPhysicalDevice mPhysicalDevice;
   QueueFamilyIndices mQueueFamilyIndices;
+  VkDevice mDevice;
+  VkQueue mGraphicsQueue;
   VkDebugUtilsMessengerEXT mDebugMessenger;
 };
 

@@ -6,8 +6,15 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <vector>
+
+struct QueueFamilyIndices {
+  std::optional<uint32_t> graphicsFamily;
+
+  bool IsComplete() const;
+};
 
 class HelloTriangleApplication {
 public:
@@ -20,7 +27,8 @@ public:
 private:
   GLFWwindow *mpWindow;
   VkInstance mInstance;
-  VkPhysicalDevice mPhysicalDevice = VK_NULL_HANDLE;
+  VkPhysicalDevice mPhysicalDevice;
+  QueueFamilyIndices mQueueFamilyIndices;
   VkDebugUtilsMessengerEXT mDebugMessenger;
 };
 

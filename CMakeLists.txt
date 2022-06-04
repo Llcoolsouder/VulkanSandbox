@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(VulkanTutorial)
 
+set(CMAKE_CXX_STANDARD 17)
+
 find_package(Vulkan REQUIRED)
 
 set(GLFW_DIR "submodules/glfw")

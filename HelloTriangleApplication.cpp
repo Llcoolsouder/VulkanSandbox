@@ -48,14 +48,18 @@ DestroyDebugUtilsMessengerEXT(VkInstance instance,
                               VkDebugUtilsMessengerEXT debugMessenger,
                               VkAllocationCallbacks const *pAllocator);
 
+static QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
+
 //==============================================================================
 // Definitions
 //==============================================================================
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 HelloTriangleApplication::HelloTriangleApplication()
-    : mpWindow(InitWindow()), mInstance(CreateInstance()),
+    : mpWindow(InitWindow()),
+      mInstance(CreateInstance()),
       mPhysicalDevice(PickPhysicalDevice(mInstance)),
+      mQueueFamilyIndices(FindQueueFamilies(mPhysicalDevice)),
       mDebugMessenger(SetupDebugMessenger(mInstance)) {}
 
 //------------------------------------------------------------------------------
@@ -319,4 +323,39 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance,
   if (func != nullptr) {
     func(instance, debugMessenger, pAllocator);
   }
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device) {
+  QueueFamilyIndices indices;
+
+  uint32_t queueFamilyCount = 0;
+  vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+  std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyCount);
+  vkGetPhysicalDeviceQueueFamilyProperties(
+      device, &queueFamilyCount, queueFamilyProperties.data());
+
+  for (uint32_t i = 0; i < queueFamilyCount; ++i) {
+    if (queueFamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+      indices.graphicsFamily = i;
+    }
+
+    if (indices.IsComplete()) {
+      break;
+    }
+  }
+
+  if (!indices.IsComplete()) {
+    throw std::runtime_error(
+        "Selected device does not support all required queue families");
+  }
+
+  return indices;
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+bool QueueFamilyIndices::IsComplete() const {
+  return graphicsFamily.has_value();
 }

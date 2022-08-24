@@ -18,45 +18,49 @@ static std::vector<char const *> const VALIDATION_LAYERS = {
 // Helper Declarations
 //==============================================================================
 
-static GLFWwindow *InitWindow();
+namespace {
+GLFWwindow *InitWindow();
 
-static VkInstance CreateInstance();
+VkInstance CreateInstance();
 
-static std::vector<char const *> GetRequiredExtensions();
+VkSurfaceKHR CreateSurface(VkInstance const &instance, GLFWwindow *pWindow);
 
-static VkPhysicalDevice PickPhysicalDevice(VkInstance const &instance);
+std::vector<char const *> GetRequiredExtensions();
 
-static bool IsDeviceSuitable(VkPhysicalDevice const &device);
+VkPhysicalDevice PickPhysicalDevice(VkInstance const &instance);
 
-static VkDevice
-CreateLogicalDevice(VkPhysicalDevice const &physicalDevice,
-                    QueueFamilyIndices const &queueFamilyIndices);
+bool IsDeviceSuitable(VkPhysicalDevice const &device);
 
-static VkQueue
-GetGraphicsQueueHandle(VkDevice const &device,
-                       QueueFamilyIndices const &queueFamilyIndices);
+VkDevice CreateLogicalDevice(VkPhysicalDevice const &physicalDevice,
+                             QueueFamilyIndices const &queueFamilyIndices);
 
-static VkDebugUtilsMessengerEXT SetupDebugMessenger(VkInstance const &instance);
+VkQueue GetGraphicsQueueHandle(VkDevice const &device,
+                               QueueFamilyIndices const &queueFamilyIndices);
 
-static bool CheckValidationLayerSupport();
+VkQueue GetPresentQueueHandle(VkDevice const &device,
+                              QueueFamilyIndices const &queueFamilyIndices);
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback();
+VkDebugUtilsMessengerEXT SetupDebugMessenger(VkInstance const &instance);
 
-static VkDebugUtilsMessengerCreateInfoEXT
-GetDefaultDebugUtilsMessengerCreateInfoEXT();
+bool CheckValidationLayerSupport();
 
-static VkResult CreateDebugUtilsMessengerEXT(
+VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback();
+
+VkDebugUtilsMessengerCreateInfoEXT GetDefaultDebugUtilsMessengerCreateInfoEXT();
+
+VkResult CreateDebugUtilsMessengerEXT(
     VkInstance instance,
     VkDebugUtilsMessengerCreateInfoEXT const *pCreateInfo,
     VkAllocationCallbacks const *pAllocator,
     VkDebugUtilsMessengerEXT *pDebugMessenger);
 
-static void
-DestroyDebugUtilsMessengerEXT(VkInstance instance,
-                              VkDebugUtilsMessengerEXT debugMessenger,
-                              VkAllocationCallbacks const *pAllocator);
+void DestroyDebugUtilsMessengerEXT(VkInstance instance,
+                                   VkDebugUtilsMessengerEXT debugMessenger,
+                                   VkAllocationCallbacks const *pAllocator);
 
-static QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
+QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice const &device,
+                                     VkSurfaceKHR const &surface);
+} // namespace
 
 //==============================================================================
 // Definitions
@@ -66,11 +70,12 @@ static QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
 HelloTriangleApplication::HelloTriangleApplication()
     : mpWindow(InitWindow()),
       mInstance(CreateInstance()),
+      mDebugMessenger(SetupDebugMessenger(mInstance)),
+      mSurface(CreateSurface(mInstance, mpWindow)),
       mPhysicalDevice(PickPhysicalDevice(mInstance)),
-      mQueueFamilyIndices(FindQueueFamilies(mPhysicalDevice)),
+      mQueueFamilyIndices(FindQueueFamilies(mPhysicalDevice, mSurface)),
       mDevice(CreateLogicalDevice(mPhysicalDevice, mQueueFamilyIndices)),
-      mGraphicsQueue(GetGraphicsQueueHandle(mDevice, mQueueFamilyIndices)),
-      mDebugMessenger(SetupDebugMessenger(mInstance)) {}
+      mGraphicsQueue(GetGraphicsQueueHandle(mDevice, mQueueFamilyIndices)) {}
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -79,6 +84,7 @@ HelloTriangleApplication::~HelloTriangleApplication() {
   if (ENABLE_VALIDATION_LAYERS) {
     DestroyDebugUtilsMessengerEXT(mInstance, mDebugMessenger, nullptr);
   }
+  vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
   vkDestroyInstance(mInstance, nullptr);
   glfwDestroyWindow(mpWindow);
   glfwTerminate();
@@ -91,6 +97,8 @@ void HelloTriangleApplication::Run() {
     glfwPollEvents();
   }
 }
+
+namespace {
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -139,6 +147,17 @@ VkInstance CreateInstance() {
     throw std::runtime_error("Failed to create Vulkan instance");
   }
   return instance;
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+VkSurfaceKHR CreateSurface(VkInstance const &instance, GLFWwindow *pWindow) {
+  VkSurfaceKHR surface;
+  if (glfwCreateWindowSurface(instance, pWindow, nullptr, &surface) !=
+      VK_SUCCESS) {
+    throw std::runtime_error("Unable to create window surface");
+  }
+  return surface;
 }
 
 //------------------------------------------------------------------------------
@@ -229,19 +248,27 @@ bool IsDeviceSuitable(VkPhysicalDevice const &device) {
 //------------------------------------------------------------------------------
 VkDevice CreateLogicalDevice(VkPhysicalDevice const &physicalDevice,
                              QueueFamilyIndices const &queueFamilyIndices) {
-  VkDeviceQueueCreateInfo queueCreateInfo{};
-  queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-  queueCreateInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
-  queueCreateInfo.queueCount = 1;
+
+  auto const uniqueQueueFamilyIndices = queueFamilyIndices.ToSet();
+  std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+  queueCreateInfos.reserve(uniqueQueueFamilyIndices.size());
   float const queuePriority = 1.0f;
-  queueCreateInfo.pQueuePriorities = &queuePriority;
+  for (auto const uniqueQueueFamilyIndex : uniqueQueueFamilyIndices) {
+    VkDeviceQueueCreateInfo queueCreateInfo{};
+    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueCreateInfo.queueFamilyIndex = uniqueQueueFamilyIndex;
+    queueCreateInfo.queueCount = 1;
+    queueCreateInfo.pQueuePriorities = &queuePriority;
+    queueCreateInfos.push_back(queueCreateInfo);
+  }
 
   VkPhysicalDeviceFeatures physicsalDeviceFeatures{};
 
   VkDeviceCreateInfo deviceCreateInfo{};
   deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  deviceCreateInfo.queueCreateInfoCount = 1;
-  deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+  deviceCreateInfo.queueCreateInfoCount =
+      static_cast<uint32_t>(queueCreateInfos.size());
+  deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
   deviceCreateInfo.enabledExtensionCount = 0;
 
   if (ENABLE_VALIDATION_LAYERS) {
@@ -266,6 +293,16 @@ VkQueue GetGraphicsQueueHandle(VkDevice const &device,
   VkQueue queueHandle;
   vkGetDeviceQueue(
       device, queueFamilyIndices.graphicsFamily.value(), 0, &queueHandle);
+  return queueHandle;
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+VkQueue GetPresentQueueHandle(VkDevice const &device,
+                              QueueFamilyIndices const &queueFamilyIndices) {
+  VkQueue queueHandle;
+  vkGetDeviceQueue(
+      device, queueFamilyIndices.presentFamily.value(), 0, &queueHandle);
   return queueHandle;
 }
 
@@ -382,7 +419,8 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance,
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device) {
+QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice const &device,
+                                     VkSurfaceKHR const &surface) {
   QueueFamilyIndices indices;
 
   uint32_t queueFamilyCount = 0;
@@ -394,6 +432,12 @@ QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device) {
   for (uint32_t i = 0; i < queueFamilyCount; ++i) {
     if (queueFamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
       indices.graphicsFamily = i;
+    }
+
+    VkBool32 presentSupport = false;
+    vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+    if (presentSupport) {
+      indices.presentFamily = i;
     }
 
     if (indices.IsComplete()) {
@@ -409,8 +453,16 @@ QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device) {
   return indices;
 }
 
+} // namespace
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 bool QueueFamilyIndices::IsComplete() const {
-  return graphicsFamily.has_value();
+  return graphicsFamily.has_value() && presentFamily.has_value();
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+std::set<uint32_t> QueueFamilyIndices::ToSet() const {
+  return {graphicsFamily.value(), presentFamily.value()};
 }
